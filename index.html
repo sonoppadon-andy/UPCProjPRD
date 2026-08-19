@@ -319,12 +319,12 @@
       <h2 class="section-title">บันทึกระยะทาง</h2>
       <div class="card">
         <div class="field">
-          <label for="log-name">ชื่อของคุณ</label>
-          <select id="log-name"><option value="">-- เลือกชื่อ --</option></select>
+          <label for="log-team">ทีมของคุณ</label>
+          <select id="log-team"><option value="">-- เลือกทีม --</option></select>
         </div>
         <div class="field">
-          <label>ทีมของฉัน</label>
-          <div class="readonly-field" id="log-team-display">เลือกชื่อก่อนเพื่อดูทีม</div>
+          <label for="log-name">ชื่อของคุณ</label>
+          <select id="log-name" disabled><option value="">-- เลือกทีมก่อน --</option></select>
         </div>
         <div class="field">
           <label for="log-distance">ระยะทาง</label>
@@ -862,13 +862,52 @@ function getAllKnownNames(){
   ].map(n=>(n||'').trim()).filter(Boolean))].sort();
 }
 
+function getMembersInTeam(team){
+  const names = getAllKnownNames();
+  if(team === NO_TEAM){
+    return names.filter(n => !memberTeams[n] || !memberTeams[n].trim());
+  }
+  return names.filter(n => (memberTeams[n] || '').trim() === team);
+}
+
+// เติมรายชื่อใน dropdown "ชื่อของคุณ" ตามทีมที่เลือกไว้ใน dropdown "ทีมของคุณ"
+function renderLogNameOptions(){
+  const teamSel = document.getElementById('log-team');
+  const nameSel = document.getElementById('log-name');
+  const team = teamSel.value;
+  const currentName = nameSel.value;
+
+  if(!team){
+    nameSel.innerHTML = '<option value="">-- เลือกทีมก่อน --</option>';
+    nameSel.disabled = true;
+    return;
+  }
+  const members = getMembersInTeam(team);
+  if(members.length === 0){
+    nameSel.innerHTML = '<option value="">-- ไม่มีสมาชิกในทีมนี้ --</option>';
+    nameSel.disabled = true;
+    return;
+  }
+  nameSel.disabled = false;
+  nameSel.innerHTML = '<option value="">-- เลือกชื่อ --</option>' +
+    members.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  if(members.includes(currentName)) nameSel.value = currentName;
+}
+document.getElementById('log-team').addEventListener('change', renderLogNameOptions);
+
 function renderNameLists(){
   const names = getAllKnownNames();
 
-  const logSel = document.getElementById('log-name');
-  const logCurrent = logSel.value;
-  logSel.innerHTML = '<option value="">-- เลือกชื่อ --</option>' + names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-  if(names.includes(logCurrent)) logSel.value = logCurrent;
+  // เมนู "บันทึกระยะทาง": เลือกทีมก่อน แล้วชื่อจะกรองตามทีมนั้น
+  const teamSel = document.getElementById('log-team');
+  const teamCurrent = teamSel.value;
+  const knownTeams = getKnownTeams();
+  const teamOptions = [...knownTeams];
+  if(names.some(n => !memberTeams[n] || !memberTeams[n].trim())) teamOptions.push(NO_TEAM);
+  teamSel.innerHTML = '<option value="">-- เลือกทีม --</option>' +
+    teamOptions.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  if(teamOptions.includes(teamCurrent)) teamSel.value = teamCurrent;
+  renderLogNameOptions();
 
   const sel = document.getElementById('hist-select');
   const current = sel.value;
@@ -878,25 +917,6 @@ function renderNameLists(){
   const teams = [...new Set(Object.values(memberTeams).map(t=>(t||'').trim()).filter(Boolean))].sort();
   document.getElementById('team-list').innerHTML = teams.map(t=>`<option value="${escapeHtml(t)}">`).join('');
 }
-
-function updateLogTeamDisplay(){
-  const name = document.getElementById('log-name').value.trim();
-  const el = document.getElementById('log-team-display');
-  if(!name){
-    el.textContent = 'เลือกชื่อก่อนเพื่อดูทีม';
-    el.classList.remove('assigned');
-    return;
-  }
-  const team = memberTeams[name];
-  if(team){
-    el.textContent = team;
-    el.classList.add('assigned');
-  }else{
-    el.textContent = 'ยังไม่ได้กำหนดทีม (ติดต่อ Admin)';
-    el.classList.remove('assigned');
-  }
-}
-document.getElementById('log-name').addEventListener('change', updateLogTeamDisplay);
 
 // ---------- Render: History ----------
 function renderHistory(){
@@ -958,14 +978,15 @@ document.getElementById('log-photo').addEventListener('change', handleLogPhotoCh
 document.getElementById('log-date').value = todayStr();
 
 document.getElementById('log-submit').addEventListener('click', async ()=>{
+  const team = document.getElementById('log-team').value;
   const name = document.getElementById('log-name').value.trim();
   const password = document.getElementById('log-password').value;
-  const team = (memberTeams[name] && memberTeams[name].trim()) || NO_TEAM;
   const distance = parseFloat(document.getElementById('log-distance').value);
   const date = document.getElementById('log-date').value || todayStr();
   const btn = document.getElementById('log-submit');
 
-  if(!name){ showToast('กรุณาใส่ชื่อของคุณ', true); return; }
+  if(!team){ showToast('กรุณาเลือกทีมของคุณ', true); return; }
+  if(!name){ showToast('กรุณาเลือกชื่อของคุณ', true); return; }
   if(memberPasswords[name] && password !== memberPasswords[name]){
     showToast('รหัสผ่านไม่ถูกต้อง', true); return;
   }
@@ -981,7 +1002,7 @@ document.getElementById('log-submit').addEventListener('click', async ()=>{
     document.getElementById('log-distance').value = '';
     document.getElementById('log-name').value = '';
     document.getElementById('log-password').value = '';
-    updateLogTeamDisplay();
+    renderLogNameOptions();
     pendingPhoto = null;
     document.getElementById('photo-drop').innerHTML = `<span id="photo-drop-label">แตะเพื่ออัปโหลดรูป</span><input type="file" accept="image/*" id="log-photo">`;
     renderAll();
@@ -1382,7 +1403,6 @@ document.getElementById('hist-select').addEventListener('change', renderHistory)
 function renderAll(){
   renderLeaderboard();
   renderNameLists();
-  updateLogTeamDisplay();
   if(document.getElementById('view-history').classList.contains('active')) renderHistory();
   if(adminUnlocked){ renderAdminTable(); renderPasswordManager(); renderTeamManager(); renderTeamPhotoManager(); }
 }
