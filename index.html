@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UPC Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root{
+    --bg: #12161c;
+    --surface: #1a2029;
+    --surface-2: #212836;
+    --line: #2b3341;
+    --chalk: #f0ede6;
+    --muted: #8b93a3;
+    --coral: #ff6b4a;
+    --coral-dim: #7a3d30;
+    --trail: #6fae6a;
+    --gold: #e8b340;
+    --silver: #b9c1cc;
+    --bronze: #c77b4e;
+    --danger: #e5574a;
+    --font-display: 'Bebas Neue', sans-serif;
+    --font-body: 'IBM Plex Sans Thai', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      repeating-linear-gradient(180deg, transparent 0 46px, rgba(255,255,255,0.02) 46px 48px),
+      var(--bg);
+    color:var(--chalk);
+    font-family:var(--font-body);
+    min-height:100vh;
+  }
+  .app{max-width:760px;margin:0 auto;padding:0 16px 60px;}
+
+  /* Header / nav */
+  .topbar{
+    position:sticky; top:0; z-index:20;
+    background:rgba(18,22,28,0.92);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+    padding:18px 16px 0;
+    margin:0 -16px;
+  }
+  .topbar-logo img {
+  height: 60px;      /* ปรับขนาด Logo ให้พอดีกับ topbar (ควรน้อยกว่าความสูง topbar เล็กน้อย) */
+  width: auto;       /* รักษาอัตราส่วนรูปภาพ */
+  display: block;
+  }
+  .brand{
+    display:flex; align-items:baseline; gap:10px; padding:0 0 14px;
+  }
+  .brand .bib{
+    font-family:var(--font-display);
+    font-size:15px; letter-spacing:2px; color:var(--coral);
+    border:1.5px solid var(--coral); border-radius:4px; padding:2px 8px;
+  }
+  .brand h1{
+    font-family:var(--font-display);
+    font-size:26px; letter-spacing:1px; margin:0; font-weight:400;
+  }
+  nav{display:flex; gap:4px; overflow-x:auto;}
+  nav button{
+    background:none; border:none; color:var(--muted);
+    font-family:var(--font-body); font-weight:600; font-size:14px;
+    padding:10px 14px; cursor:pointer; white-space:nowrap;
+    border-bottom:3px solid transparent;
+    transition:color .15s, border-color .15s;
+  }
+  nav button.active{color:var(--chalk); border-color:var(--coral);}
+  nav button:hover{color:var(--chalk);}
+
+  main{padding-top:22px;}
+  .view{display:none;}
+  .view.active{display:block; animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+  /* Team total banner */
+  .banner{
+    background:linear-gradient(135deg, var(--surface-2), var(--surface));
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:22px 20px;
+    margin-bottom:22px;
+    position:relative;
+    overflow:hidden;
+  }
+  .banner::after{
+    content:"";
+    position:absolute; inset:0;
+    background-image: repeating-linear-gradient(90deg, transparent 0 22px, rgba(255,255,255,0.035) 22px 26px);
+    pointer-events:none;
+  }
+  .banner .eyebrow{
+    font-size:12px; letter-spacing:3px; color:var(--muted); text-transform:uppercase; font-weight:600;
+  }
+  .banner .total{
+    font-family:var(--font-mono); font-weight:700;
+    font-size:52px; line-height:1.1; color:var(--chalk);
+    display:flex; align-items:baseline; gap:8px;
+  }
+  .banner .total span{font-size:20px; color:var(--coral); font-weight:700;}
+  .banner .sub{color:var(--muted); font-size:13px; margin-top:4px;}
+
+  /* Leaderboard rows */
+  .lane{
+    position:relative;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    margin-bottom:10px;
+    padding:12px 14px;
+    display:flex; align-items:center; gap:14px;
+    overflow:hidden;
+  }
+  .lane .fill{
+    position:absolute; left:0; top:0; bottom:0;
+    background:linear-gradient(90deg, rgba(255,107,74,0.16), rgba(255,107,74,0.03));
+    width:0%;
+    transition:width 1s cubic-bezier(.2,.8,.2,1);
+    border-right:2px dashed rgba(255,107,74,0.25);
+  }
+  .lane.rank-1 .fill{background:linear-gradient(90deg, rgba(232,179,64,0.22), rgba(232,179,64,0.03)); border-color:rgba(232,179,64,0.35);}
+  .lane.rank-2 .fill{background:linear-gradient(90deg, rgba(185,193,204,0.18), rgba(185,193,204,0.03)); border-color:rgba(185,193,204,0.3);}
+  .lane.rank-3 .fill{background:linear-gradient(90deg, rgba(199,123,78,0.2), rgba(199,123,78,0.03)); border-color:rgba(199,123,78,0.3);}
+  .lane-content{position:relative; z-index:1; display:flex; align-items:center; gap:14px; width:100%;}
+  .bib-badge{
+    font-family:var(--font-display);
+    font-size:22px; min-width:38px; height:38px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:8px; border:1.5px solid var(--line);
+    background:var(--surface-2); color:var(--muted); flex-shrink:0;
+  }
+  .rank-1 .bib-badge{border-color:var(--gold); color:var(--gold);}
+  .rank-2 .bib-badge{border-color:var(--silver); color:var(--silver);}
+  .rank-3 .bib-badge{border-color:var(--bronze); color:var(--bronze);}
+  .lane-info{flex:1; min-width:0;}
+  .lane-name{font-weight:600; font-size:15px;}
+  .lane-meta{font-size:12px; color:var(--muted); margin-top:1px;}
+  .lane-dist{
+    font-family:var(--font-mono); font-weight:700; font-size:18px; text-align:right; flex-shrink:0;
+  }
+  .lane-dist span{font-size:11px; color:var(--muted); font-weight:500; display:block;}
+
+  .lane{cursor:pointer;}
+  .lane-chevron{
+    flex-shrink:0; color:var(--muted); font-size:12px; transition:transform .2s;
+    width:16px; text-align:center;
+  }
+  .lane.expanded .lane-chevron{transform:rotate(90deg); color:var(--coral);}
+  .team-members{
+    display:none; margin:-4px 0 10px; padding:4px 4px 4px 52px;
+  }
+  .team-members.show{display:block;}
+  .member-row{
+    display:flex; align-items:center; gap:10px; padding:8px 10px;
+    border-left:2px solid var(--line); font-size:13px;
+  }
+  .member-row .m-rank{color:var(--muted); font-family:var(--font-mono); width:18px; flex-shrink:0;}
+  .member-row .m-name{flex:1; font-weight:500;}
+  .member-row .m-dist{font-family:var(--font-mono); font-weight:700; color:var(--chalk);}
+  .member-row .m-count{color:var(--muted); font-size:11px; margin-left:6px;}
+
+  /* Empty state */
+  .empty{
+    text-align:center; padding:40px 20px; color:var(--muted);
+    border:1px dashed var(--line); border-radius:12px;
+  }
+  .empty .big{font-family:var(--font-display); font-size:20px; color:var(--chalk); letter-spacing:1px; margin-bottom:6px;}
+
+  /* Forms */
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px;}
+  .field{margin-bottom:16px;}
+  label{display:block; font-size:13px; font-weight:600; color:var(--muted); margin-bottom:6px;}
+  input[type=text], input[type=number], input[type=date], select{
+    width:100%; background:var(--surface-2); border:1px solid var(--line);
+    color:var(--chalk); padding:11px 12px; border-radius:8px; font-size:15px;
+    font-family:var(--font-body);
+  }
+  select{
+    appearance:none; -webkit-appearance:none; -moz-appearance:none;
+    padding-right:38px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4' stroke='%238b93a3' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 12px center;
+    cursor:pointer;
+    font-weight:600;
+  }
+  select:invalid, select option[value=""]{ color:var(--muted); }
+  #log-name{
+    font-size:16px;
+    padding:13px 38px 13px 14px;
+    border:1.5px solid var(--coral-dim);
+  }
+  #log-name:focus{ border-color:var(--coral); }
+  input:focus, select:focus{outline:2px solid var(--coral); outline-offset:1px;}
+  .distance-input-wrap{position:relative;}
+  .distance-input-wrap span{
+    position:absolute; right:12px; top:50%; transform:translateY(-50%);
+    color:var(--muted); font-size:13px; font-family:var(--font-mono);
+  }
+  .photo-drop{
+    border:1.5px dashed var(--line); border-radius:10px; padding:18px;
+    text-align:center; cursor:pointer; color:var(--muted); font-size:13px;
+    position:relative; overflow:hidden; min-height:60px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .photo-drop img{max-height:160px; border-radius:6px; margin:0 auto; display:block;}
+  .photo-drop input{position:absolute; inset:0; opacity:0; cursor:pointer;}
+  .readonly-field{
+    background:var(--surface-2); border:1px solid var(--line); border-radius:8px;
+    padding:11px 12px; font-size:15px; color:var(--muted);
+  }
+  .readonly-field.assigned{color:var(--chalk); font-weight:600;}
+  button.primary{
+    background:var(--coral); color:#1a0f0b; border:none; font-weight:700;
+    font-size:15px; padding:13px 20px; border-radius:9px; cursor:pointer; width:100%;
+    transition:filter .15s, transform .15s;
+  }
+  button.primary:hover{filter:brightness(1.08);}
+  button.primary:active{transform:scale(.99);}
+  button.primary:disabled{opacity:.5; cursor:not-allowed;}
+  .toast{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--trail); color:#0e1a0d; font-weight:700; font-size:14px;
+    padding:12px 22px; border-radius:30px; opacity:0; pointer-events:none;
+    transition:opacity .25s, transform .25s; z-index:50; white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .toast.error{background:var(--danger); color:#2a0d0a;}
+
+  /* History list */
+  .hist-item{
+    display:flex; gap:12px; background:var(--surface); border:1px solid var(--line);
+    border-radius:10px; padding:12px; margin-bottom:10px; align-items:center;
+  }
+  .hist-item img{width:56px; height:56px; object-fit:cover; border-radius:6px; flex-shrink:0; border:1px solid var(--line);}
+  .hist-item .ph-none{width:56px; height:56px; border-radius:6px; background:var(--surface-2); flex-shrink:0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:10px; text-align:center; border:1px solid var(--line);}
+  .hist-info{flex:1;}
+  .hist-dist{font-family:var(--font-mono); font-weight:700; font-size:16px;}
+  .hist-date{font-size:12px; color:var(--muted);}
+
+  /* Admin */
+  .lock-screen{text-align:center; padding:40px 20px;}
+  .lock-screen input{max-width:220px; margin:0 auto 14px; text-align:center; letter-spacing:2px;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{text-align:left; color:var(--muted); font-weight:600; padding:8px 6px; border-bottom:1px solid var(--line); font-size:11px; text-transform:uppercase; letter-spacing:.5px;}
+  td{padding:9px 6px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  td img{width:36px; height:36px; object-fit:cover; border-radius:5px; cursor:pointer;}
+  .row-actions{display:flex; gap:6px;}
+  .row-actions button{
+    background:var(--surface-2); border:1px solid var(--line); color:var(--chalk);
+    border-radius:6px; padding:5px 9px; font-size:12px; cursor:pointer; font-family:var(--font-body);
+  }
+  .row-actions button.del{color:var(--danger); border-color:var(--coral-dim);}
+  .row-actions button.save{color:var(--trail); border-color:var(--trail);}
+  .edit-input{width:100%; background:var(--surface-2); border:1px solid var(--line); color:var(--chalk); padding:5px 7px; border-radius:5px; font-size:13px; font-family:var(--font-body);}
+  .admin-bar{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
+  .admin-subnav{display:flex; gap:8px; overflow-x:auto; margin-bottom:18px; padding-bottom:4px;}
+  .admin-subnav button{flex:0 0 auto; background:var(--surface); border:1px solid var(--line); color:var(--muted); border-radius:8px; padding:9px 13px; font-family:var(--font-body); font-size:13px; font-weight:600; cursor:pointer;}
+  .admin-subnav button:hover{color:var(--chalk); border-color:var(--coral-dim);}
+  .admin-subnav button.active{color:var(--chalk); border-color:var(--coral); background:rgba(255,107,74,.10);}
+  .admin-panel{display:none;}
+  .admin-panel.active{display:block; animation:fade .2s ease;}
+  .team-logo{width:42px; height:42px; border-radius:9px; object-fit:cover; border:1px solid var(--line); background:var(--surface-2); flex-shrink:0;}
+  .team-logo-placeholder{width:42px; height:42px; border-radius:9px; border:1px dashed var(--line); background:var(--surface-2); color:var(--muted); display:flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0;}
+  .team-photo-preview{max-width:180px; max-height:180px; width:auto; height:auto; object-fit:contain; border-radius:10px; border:1px solid var(--line); display:none; margin:0 auto 8px;}
+  .team-photo-actions{display:flex; gap:8px; margin-top:10px;}
+  .team-photo-actions button{flex:1;}
+  .secondary-btn{background:var(--surface-2); color:var(--chalk); border:1px solid var(--line); font-weight:600; font-size:14px; padding:12px 16px; border-radius:9px; cursor:pointer; font-family:var(--font-body);}
+  .secondary-btn.danger{color:var(--danger); border-color:var(--coral-dim);}
+  .admin-bar .logout{background:none; border:1px solid var(--line); color:var(--muted); padding:6px 12px; border-radius:7px; font-size:12px; cursor:pointer;}
+  .note{font-size:12px; color:var(--muted); margin-top:10px; line-height:1.5;}
+  .section-title{font-family:var(--font-display); font-size:20px; letter-spacing:1px; margin:0 0 14px;}
+  .modal-bg{position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; align-items:center; justify-content:center; z-index:100; padding:20px;}
+  .modal-bg.show{display:flex;}
+  .modal-bg img{max-width:100%; max-height:85vh; border-radius:10px;}
+  .skeleton{color:var(--muted); text-align:center; padding:40px; font-size:14px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="topbar-logo">
+    <a href="#">
+      <img src="imgbanner.png" alt="UPC Project">
+    </a>
+    </div>
+    <div class="brand">
+      <!-- <span class="bib">RUN</span> 
+      <h1>UPC Project</h1> -->
+    </div>
+    <nav>
+      <button class="tab-btn active" data-view="leaderboard">Leaderboard</button>
+      <button class="tab-btn" data-view="log">บันทึกระยะทาง</button>
+      <button class="tab-btn" data-view="history">ประวัติของฉัน</button>
+      <button class="tab-btn" data-view="admin">Admin</button>
+    </nav>
+  </div>
+
+  <main>
+    <!-- LEADERBOARD -->
+    <section class="view active" id="view-leaderboard">
+      <div class="banner">
+        <div class="eyebrow">ระยะรวมทุกทีม</div>
+        <div class="total" id="team-total">0.0 <span>KM</span></div>
+        <div class="sub" id="team-sub">รอข้อมูล...</div>
+      </div>
+      <div id="leaderboard-list"><div class="skeleton">กำลังโหลด...</div></div>
+    </section>
+
+    <!-- LOG RUN -->
+    <section class="view" id="view-log">
+      <h2 class="section-title">บันทึกระยะทาง</h2>
+      <div class="card">
+        <div class="field">
+          <label for="log-name">ชื่อของคุณ</label>
+          <select id="log-name"><option value="">-- เลือกชื่อ --</option></select>
+        </div>
+        <div class="field">
+          <label>ทีมของฉัน</label>
+          <div class="readonly-field" id="log-team-display">เลือกชื่อก่อนเพื่อดูทีม</div>
+        </div>
+        <div class="field">
+          <label for="log-distance">ระยะทาง</label>
+          <div class="distance-input-wrap">
+            <input type="number" id="log-distance" step="0.1" min="0" placeholder="0.0">
+            <span> KM</span>  
+          </div>
+        </div>
+        <div class="field">
+          <label for="log-date">วันที่วิ่ง</label>
+          <input type="date" id="log-date">
+        </div>
+        <div class="field">
+          <label>รูปหลักฐาน</label>
+          <div class="photo-drop" id="photo-drop">
+            <span id="photo-drop-label">แตะเพื่ออัปโหลดรูป</span>
+            <input type="file" accept="image/*" id="log-photo">
+          </div>
+        </div>
+        <div class="field">
+          <label for="log-password">รหัสผ่านของฉัน</label>
+          <input type="password" id="log-password" style="width:29%;"placeholder="กรอกรหัสผ่านที่ Admin ตั้งให้">
+        </div>
+        <button class="primary" id="log-submit">บันทึก</button>
+      </div>
+    </section>
+
+    <!-- MY HISTORY -->
+    <section class="view" id="view-history">
+      <h2 class="section-title">ประวัติของฉัน</h2>
+      <div class="field">
+        <label for="hist-select">ฉันคือใคร</label>
+        <select id="hist-select"><option value="">-- เลือกชื่อ --</option></select>
+      </div>
+      <div id="history-list"></div>
+    </section>
+
+    <!-- ADMIN -->
+    <section class="view" id="view-admin">
+      <div id="admin-locked" class="lock-screen">
+        <div class="big" style="font-family:var(--font-display); font-size:22px; letter-spacing:1px; margin-bottom:10px;">พื้นที่ Admin</div>
+        <p class="note" style="margin-bottom:16px;">ใส่รหัสผ่านเพื่อแก้ไขหรือลบรายการ</p>
+        <input type="text" id="admin-pass" placeholder="รหัสผ่าน">
+        <button class="primary" style="max-width:220px; margin:0 auto;" id="admin-unlock">ปลดล็อก</button>
+      </div>
+      <div id="admin-unlocked" style="display:none;">
+        <div class="admin-bar">
+          <h2 class="section-title" style="margin:0;">Admin</h2>
+          <button class="logout" id="admin-logout">ออกจากระบบ</button>
+        </div>
+
+        <div class="admin-subnav" aria-label="เมนูย่อย Admin">
+          <button class="admin-subtab active" data-admin-panel="records">จัดการรายการทั้งหมด</button>
+          <button class="admin-subtab" data-admin-panel="passwords">รหัสผ่านสมาชิก</button>
+          <button class="admin-subtab" data-admin-panel="teams">กำหนดทีมสมาชิก</button>
+        </div>
+
+        <div class="admin-panel active" id="admin-panel-records">
+          <h2 class="section-title">จัดการรายการทั้งหมด</h2>
+          <div style="overflow-x:auto;">
+            <table id="admin-table">
+              <thead><tr><th>รูป</th><th>ชื่อ</th><th>ทีม</th><th>KM</th><th>วันที่</th><th></th></tr></thead>
+              <tbody id="admin-tbody"></tbody>
+            </table>
+          </div>
+          <p class="note">ข้อมูลทั้งหมดนี้แชร์กับสมาชิกทุกคนที่เปิดแอปนี้</p>
+        </div>
+
+        <div class="admin-panel" id="admin-panel-passwords">
+          <div class="card">
+            <h2 class="section-title" style="font-size:18px;">รหัสผ่านสมาชิก</h2>
+            <p class="note" style="margin-top:0;">ตั้งรหัสผ่านให้สมาชิกแต่ละคน สมาชิกต้องกรอกรหัสให้ถูกก่อนบันทึกระยะทาง</p>
+            <div style="overflow-x:auto;">
+              <table id="pw-table">
+                <thead><tr><th>ชื่อ</th><th>รหัสผ่าน</th><th></th></tr></thead>
+                <tbody id="pw-tbody"></tbody>
+              </table>
+            </div>
+            <div class="field" style="margin-top:14px;">
+              <label>เพิ่มสมาชิกใหม่ + ตั้งรหัสผ่าน</label>
+              <div style="display:flex; gap:8px;">
+                <input type="text" id="pw-new-name" placeholder="ชื่อสมาชิก" style="flex:1;">
+                <input type="text" id="pw-new-pass" placeholder="รหัสผ่าน" style="flex:1;">
+              </div>
+              <button class="primary" style="margin-top:10px;" id="pw-add-btn">เพิ่ม/ตั้งรหัส</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-panel" id="admin-panel-teams">
+          <div class="card">
+            <h2 class="section-title" style="font-size:18px;">กำหนดทีมสมาชิก</h2>
+            <p class="note" style="margin-top:0;">กำหนดว่าสมาชิกแต่ละคนอยู่ทีมใด และจัดการรูปประจำทีมสำหรับแสดงบน Leaderboard</p>
+
+            <div class="field" style="padding-bottom:18px; border-bottom:1px solid var(--line);">
+              <label for="team-photo-team">รูปประจำทีม</label>
+              <select id="team-photo-team"><option value="">-- เลือกทีม --</option></select>
+              <div class="photo-drop" id="team-photo-drop" style="margin-top:10px; min-height:150px; flex-direction:column;">
+                <img id="team-photo-preview" class="team-photo-preview" alt="ตัวอย่างรูปทีม">
+                <span id="team-photo-label">เลือกทีม แล้วแตะเพื่ออัปโหลดรูป</span>
+                <input type="file" accept="image/*" id="team-photo-file">
+              </div>
+              <div class="team-photo-actions">
+                <button class="primary" id="team-photo-save" disabled>บันทึกรูปทีม</button>
+                <button class="secondary-btn danger" id="team-photo-delete" disabled>ลบรูปทีม</button>
+              </div>
+              <p class="note">แนะนำรูปสี่เหลี่ยมจัตุรัส เช่น 800 × 800 px ระบบจะย่อรูปก่อนอัปโหลดไป Supabase Storage</p>
+            </div>
+
+            <div style="overflow-x:auto; margin-top:18px;">
+              <table id="team-table">
+                <thead><tr><th>ชื่อ</th><th>ทีม</th><th></th></tr></thead>
+                <tbody id="team-tbody"></tbody>
+              </table>
+            </div>
+            <div class="field" style="margin-top:14px;">
+              <label>เพิ่มสมาชิกใหม่ + กำหนดทีม</label>
+              <div style="display:flex; gap:8px;">
+                <input type="text" id="team-new-name" placeholder="ชื่อสมาชิก" style="flex:1;">
+                <input type="text" id="team-new-team" list="team-list" placeholder="ชื่อทีม" style="flex:1;">
+              </div>
+              <datalist id="team-list"></datalist>
+              <button class="primary" style="margin-top:10px;" id="team-add-btn">เพิ่ม/กำหนดทีม</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="modal-bg" id="photo-modal"><img id="photo-modal-img" src=""></div>
+
+<script>
+const ADMIN_PASSWORD = "adMIN$123";
+
+// ---------- Supabase connection ----------
+const SUPABASE_URL = "https://ljrdbnexhwrlraqoouzk.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqcmRibmV4aHdybHJhcW9vdXprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwMzI3MTQsImV4cCI6MjEwMjYwODcxNH0.w2sjFGWWqHpJWbDxLEom58ZbU51J5VKn7lPPTexGAwo";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const RUN_PHOTO_BUCKET = 'run-photos';
+const TEAM_PHOTO_BUCKET = 'team-photos';
+
+let runs = [];
+let memberPasswords = {};
+let memberTeams = {};
+let teamPhotos = {};
+let loaded = false;
+
+// id lookup caches so the rest of the app can keep working with plain names,
+// while the database itself uses uuid foreign keys under the hood
+let teamIdByName = {};   // { "ชื่อทีม": uuid }
+let memberIdByName = {}; // { "ชื่อ": uuid }
+
+function logSupabaseError(context, e){
+  const detail = {
+    message: e?.message || String(e),
+    details: e?.details || null,
+    hint: e?.hint || null,
+    code: e?.code || null,
+    status: e?.status || null
+  };
+  const line = context + ' error -> message: ' + detail.message +
+    ' | details: ' + detail.details +
+    ' | hint: ' + detail.hint +
+    ' | code: ' + detail.code +
+    ' | status: ' + detail.status;
+  console.error(line);
+  return detail.message || detail.details || detail.hint || 'ไม่ทราบสาเหตุ (ดู console)';
+}
+
+function dataUrlToBlob(dataUrl){
+  const [meta, b64] = dataUrl.split(',');
+  const mime = meta.match(/data:(.*);base64/)[1];
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], {type: mime});
+}
+
+async function uploadPhoto(bucket, path, dataUrl){
+  const blob = dataUrlToBlob(dataUrl);
+  const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg','jpg');
+  const fullPath = `${path}-${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from(bucket).upload(fullPath, blob, {
+    contentType: blob.type,
+    upsert: true
+  });
+  if(error) throw error;
+  const { data } = sb.storage.from(bucket).getPublicUrl(fullPath);
+  return data.publicUrl;
+}
+
+// หา team_id จากชื่อทีม สร้างใหม่ให้ถ้ายังไม่มี
+async function ensureTeamId(teamName){
+  const clean = (teamName || '').trim();
+  if(!clean) return null;
+  if(teamIdByName[clean]) return teamIdByName[clean];
+  const { data: existing, error: findErr } = await sb.from('teams').select('id').eq('name', clean).maybeSingle();
+  if(findErr) throw findErr;
+  if(existing){ teamIdByName[clean] = existing.id; return existing.id; }
+  const { data: created, error: createErr } = await sb.from('teams').insert({name: clean}).select('id').single();
+  if(createErr) throw createErr;
+  teamIdByName[clean] = created.id;
+  return created.id;
+}
+
+// หา member_id จากชื่อ สร้างใหม่ให้ถ้ายังไม่มี
+async function ensureMemberId(name){
+  const clean = (name || '').trim();
+  if(!clean) return null;
+  if(memberIdByName[clean]) return memberIdByName[clean];
+  const { data: existing, error: findErr } = await sb.from('members').select('id').eq('name', clean).maybeSingle();
+  if(findErr) throw findErr;
+  if(existing){ memberIdByName[clean] = existing.id; return existing.id; }
+  const { data: created, error: createErr } = await sb.from('members').insert({name: clean}).select('id').single();
+  if(createErr) throw createErr;
+  memberIdByName[clean] = created.id;
+  return created.id;
+}
+
+async function loadPasswords(){
+  // ข้อมูลถูกโหลดพร้อมกันจาก loadAll() แล้ว
+}
+// หมายเหตุความปลอดภัย: ตอนนี้ยังเก็บรหัสผ่านเป็น plaintext ใน password_hash
+// เพื่อความคงเดิม (parity) กับระบบเก่า แนะนำให้ทำ hashing ผ่าน RPC function ในขั้นถัดไป
+async function savePasswords(){
+  try{
+    for(const [name, pass] of Object.entries(memberPasswords)){
+      const id = await ensureMemberId(name);
+      const { error } = await sb.from('members').update({password_hash: pass}).eq('id', id);
+      if(error) throw error;
+    }
+    return true;
+  }catch(e){
+    const msg = logSupabaseError('savePasswords', e);
+    showToast('บันทึกรหัสผ่านไม่สำเร็จ: ' + msg, true);
+    return false;
+  }
+}
+
+async function loadTeams(){
+  // ข้อมูลถูกโหลดพร้อมกันจาก loadAll() แล้ว
+}
+async function saveTeams(){
+  try{
+    for(const [name, team] of Object.entries(memberTeams)){
+      const memberId = await ensureMemberId(name);
+      const teamId = await ensureTeamId(team);
+      const { error } = await sb.from('members').update({team_id: teamId}).eq('id', memberId);
+      if(error) throw error;
+    }
+    return true;
+  }catch(e){
+    const msg = logSupabaseError('saveTeams', e);
+    showToast('บันทึกทีมไม่สำเร็จ: ' + msg, true);
+    return false;
+  }
+}
+
+async function saveTeamPhoto(team, photo){
+  try{
+    const url = await uploadPhoto(TEAM_PHOTO_BUCKET, `team-${team}`, photo);
+    const teamId = await ensureTeamId(team);
+    const { error } = await sb.from('teams').update({photo_url: url}).eq('id', teamId);
+    if(error) throw error;
+    teamPhotos[team] = url;
+    return true;
+  }catch(e){
+    const msg = logSupabaseError('saveTeamPhoto', e);
+    showToast('บันทึกรูปทีมไม่สำเร็จ: ' + msg, true);
+    return false;
+  }
+}
+
+async function deleteTeamPhoto(team){
+  try{
+    const teamId = await ensureTeamId(team);
+    const { error } = await sb.from('teams').update({photo_url: null}).eq('id', teamId);
+    if(error) throw error;
+    delete teamPhotos[team];
+    return true;
+  }catch(e){
+    const msg = logSupabaseError('deleteTeamPhoto', e);
+    showToast('ลบรูปทีมไม่สำเร็จ: ' + msg, true);
+    return false;
+  }
+}
+
+// ---------- Supabase Storage ----------
+async function migrateOldData(){
+  // ไม่ต้อง migrate window.storage เมื่อใช้ Supabase
+}
+
+async function loadRuns(){
+  try{
+    const [{data: teamsData, error: teamsErr},
+           {data: membersData, error: membersErr},
+           {data: runsData, error: runsErr}] = await Promise.all([
+      sb.from('teams').select('id,name,photo_url'),
+      sb.from('members').select('id,name,password_hash,team_id'),
+      sb.from('runs').select('id,member_id,distance,run_date,photo_url,created_at')
+    ]);
+    if(teamsErr) throw teamsErr;
+    if(membersErr) throw membersErr;
+    if(runsErr) throw runsErr;
+
+    teamIdByName = {}; memberIdByName = {};
+    const teamNameById = {};
+    teamPhotos = {};
+    (teamsData || []).forEach(t=>{
+      teamIdByName[t.name] = t.id;
+      teamNameById[t.id] = t.name;
+      if(t.photo_url) teamPhotos[t.name] = t.photo_url;
+    });
+
+    const memberNameById = {};
+    memberPasswords = {};
+    memberTeams = {};
+    (membersData || []).forEach(m=>{
+      memberIdByName[m.name] = m.id;
+      memberNameById[m.id] = m.name;
+      if(m.password_hash) memberPasswords[m.name] = m.password_hash;
+      if(m.team_id && teamNameById[m.team_id]) memberTeams[m.name] = teamNameById[m.team_id];
+    });
+
+    runs = (runsData || []).map(r=>({
+      id: r.id,
+      name: memberNameById[r.member_id] || '(ไม่พบชื่อ)',
+      distance: r.distance,
+      date: r.run_date,
+      photo: r.photo_url,
+      ts: new Date(r.created_at).getTime()
+    }));
+  }catch(e){
+    const msg = logSupabaseError('loadRuns', e);
+    runs = [];
+    memberPasswords = {};
+    memberTeams = {};
+    teamPhotos = {};
+    showToast('โหลดข้อมูลจาก Supabase ไม่สำเร็จ: ' + msg, true);
+  }
+  loaded = true;
+}
+
+// บันทึกรายการทั้งหมดของสมาชิกคนนั้นกลับไปยัง Supabase
+// รูปที่เป็น Base64 จะถูกอัปโหลดไป Supabase Storage แล้วเก็บ URL ไว้ในตาราง runs
+async function savePersonRuns(name){
+  const mine = runs.filter(r => r.name === name);
+  try{
+    const memberId = await ensureMemberId(name);
+
+    // ลบของเดิมทั้งหมดของคนนี้ แล้วค่อย insert ชุดใหม่ทั้งหมดแทน (เหมือน replacePersonRuns เดิม)
+    const { error: delErr } = await sb.from('runs').delete().eq('member_id', memberId);
+    if(delErr) throw delErr;
+
+    const rowsToInsert = [];
+    for(const r of mine){
+      let photoUrl = r.photo;
+      if(photoUrl && photoUrl.startsWith('data:')){
+        photoUrl = await uploadPhoto(RUN_PHOTO_BUCKET, `run-${name}`, photoUrl);
+      }
+      rowsToInsert.push({
+        member_id: memberId,
+        distance: r.distance,
+        run_date: r.date,
+        photo_url: photoUrl || null
+      });
+    }
+
+    let saved = [];
+    if(rowsToInsert.length){
+      const { data, error: insErr } = await sb.from('runs').insert(rowsToInsert).select('id,member_id,distance,run_date,photo_url,created_at');
+      if(insErr) throw insErr;
+      saved = (data || []).map(r=>({
+        id: r.id,
+        name,
+        distance: r.distance,
+        date: r.run_date,
+        photo: r.photo_url,
+        ts: new Date(r.created_at).getTime()
+      }));
+    }
+
+    runs = runs.filter(r => r.name !== name).concat(saved);
+    return true;
+  }catch(e){
+    const msg = logSupabaseError('savePersonRuns', e);
+    showToast('บันทึกไม่สำเร็จ: ' + msg, true);
+    return false;
+  }
+}
+
+// ---------- Utilities ----------
+function showToast(msg, isError){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(()=> t.className = 'toast' + (isError ? ' error' : ''), 2200);
+}
+function fmt(n){ return (Math.round(n*10)/10).toFixed(1); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(d){
+  try{
+    const dt = new Date(d + 'T00:00:00');
+    return dt.toLocaleDateString('th-TH', {day:'numeric', month:'short', year:'numeric'});
+  }catch(e){ return d; }
+}
+function uid(){ return 'r' + Date.now() + Math.random().toString(36).slice(2,7); }
+const NO_TEAM = 'ไม่ระบุทีม';
+
+function compressImage(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const maxW = 640;
+        const scale = Math.min(1, maxW / img.width);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---------- Aggregation ----------
+function aggregateMembers(){
+  const map = {};
+  runs.forEach(r=>{
+    if(!map[r.name]) map[r.name] = {name:r.name, total:0, count:0};
+    map[r.name].total += Number(r.distance);
+    map[r.name].count += 1;
+  });
+  return Object.values(map).sort((a,b)=> b.total - a.total);
+}
+function aggregateTeams(){
+  const map = {};
+  runs.forEach(r=>{
+    const team = (memberTeams[r.name] && memberTeams[r.name].trim()) || NO_TEAM;
+    if(!map[team]) map[team] = {team, total:0, count:0, members:{}};
+    map[team].total += Number(r.distance);
+    map[team].count += 1;
+    if(!map[team].members[r.name]) map[team].members[r.name] = {name:r.name, total:0, count:0};
+    map[team].members[r.name].total += Number(r.distance);
+    map[team].members[r.name].count += 1;
+  });
+  const teams = Object.values(map).map(t=>({
+    ...t,
+    members: Object.values(t.members).sort((a,b)=> b.total - a.total)
+  }));
+  return teams.sort((a,b)=> b.total - a.total);
+}
+
+// ---------- Render: Leaderboard ----------
+let expandedTeams = new Set();
+
+function renderLeaderboard(){
+  const teams = aggregateTeams();
+  const teamTotal = teams.reduce((s,t)=> s + t.total, 0);
+  document.getElementById('team-total').innerHTML = fmt(teamTotal) + ' <span>KM</span>';
+  document.getElementById('team-sub').textContent = teams.length
+    ? `จาก ${teams.length} ทีม · ${runs.length} ครั้งที่บันทึก`
+    : 'ยังไม่มีการบันทึก';
+
+  const list = document.getElementById('leaderboard-list');
+  if(teams.length === 0){
+    list.innerHTML = `<div class="empty"><div class="big">ยังไม่มีใครวิ่งเลย</div>ไปที่เมนู "บันทึกระยะทาง" เพื่อเป็นคนแรกของทีม!</div>`;
+    return;
+  }
+  const maxTotal = teams[0].total || 1;
+  list.innerHTML = teams.map((t, i)=>{
+    const rank = i+1;
+    const pct = Math.max(4, (t.total / maxTotal) * 100);
+    const isOpen = expandedTeams.has(t.team);
+    const memberRows = t.members.map((m, mi)=> `
+      <div class="member-row">
+        <span class="m-rank">${mi+1}</span>
+        <span class="m-name">${escapeHtml(m.name)}</span>
+        <span class="m-count">${m.count} ครั้ง</span>
+        <span class="m-dist">${fmt(m.total)} KM</span>
+      </div>`).join('');
+    return `<div class="lane rank-${rank}${isOpen ? ' expanded' : ''}" data-team="${escapeHtml(t.team)}">
+      <div class="fill" style="width:0%" data-target="${pct}"></div>
+      <div class="lane-content">
+        <div class="bib-badge">${rank}</div>
+        ${teamPhotos[t.team] ? `<img class="team-logo" src="${teamPhotos[t.team]}" alt="รูปทีม ${escapeHtml(t.team)}">` : `<div class="team-logo-placeholder">TEAM</div>`}
+        <div class="lane-info">
+          <div class="lane-name">${escapeHtml(t.team)}</div>
+          <div class="lane-meta">${t.members.length} สมาชิก · ${t.count} ครั้งที่บันทึก</div>
+        </div>
+        <div class="lane-dist">${fmt(t.total)}<span>KM</span></div>
+        <div class="lane-chevron">&#9656;</div>
+      </div>
+    </div>
+    <div class="team-members${isOpen ? ' show' : ''}">${memberRows}</div>`;
+  }).join('');
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.lane .fill').forEach(el=>{
+      el.style.width = el.dataset.target + '%';
+    });
+  });
+  list.querySelectorAll('.lane').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const team = el.dataset.team;
+      if(expandedTeams.has(team)) expandedTeams.delete(team);
+      else expandedTeams.add(team);
+      renderLeaderboard();
+    });
+  });
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- Render: name list / team list / history select ----------
+function getAllKnownNames(){
+  return [...new Set([
+    ...runs.map(r=>r.name),
+    ...Object.keys(memberTeams),
+    ...Object.keys(memberPasswords)
+  ].map(n=>(n||'').trim()).filter(Boolean))].sort();
+}
+
+function renderNameLists(){
+  const names = getAllKnownNames();
+
+  const logSel = document.getElementById('log-name');
+  const logCurrent = logSel.value;
+  logSel.innerHTML = '<option value="">-- เลือกชื่อ --</option>' + names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  if(names.includes(logCurrent)) logSel.value = logCurrent;
+
+  const sel = document.getElementById('hist-select');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">-- เลือกชื่อ --</option>' + names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  if(names.includes(current)) sel.value = current;
+
+  const teams = [...new Set(Object.values(memberTeams).map(t=>(t||'').trim()).filter(Boolean))].sort();
+  document.getElementById('team-list').innerHTML = teams.map(t=>`<option value="${escapeHtml(t)}">`).join('');
+}
+
+function updateLogTeamDisplay(){
+  const name = document.getElementById('log-name').value.trim();
+  const el = document.getElementById('log-team-display');
+  if(!name){
+    el.textContent = 'เลือกชื่อก่อนเพื่อดูทีม';
+    el.classList.remove('assigned');
+    return;
+  }
+  const team = memberTeams[name];
+  if(team){
+    el.textContent = team;
+    el.classList.add('assigned');
+  }else{
+    el.textContent = 'ยังไม่ได้กำหนดทีม (ติดต่อ Admin)';
+    el.classList.remove('assigned');
+  }
+}
+document.getElementById('log-name').addEventListener('change', updateLogTeamDisplay);
+
+// ---------- Render: History ----------
+function renderHistory(){
+  const name = document.getElementById('hist-select').value;
+  const listEl = document.getElementById('history-list');
+  if(!name){
+    listEl.innerHTML = `<div class="empty">เลือกชื่อของคุณด้านบนเพื่อดูประวัติการวิ่ง</div>`;
+    return;
+  }
+  const mine = runs.filter(r=>r.name === name).sort((a,b)=> b.date.localeCompare(a.date));
+  if(mine.length === 0){
+    listEl.innerHTML = `<div class="empty">ยังไม่มีประวัติของ ${escapeHtml(name)}</div>`;
+    return;
+  }
+  listEl.innerHTML = mine.map(r=>{
+    const photo = r.photo
+      ? `<img src="${r.photo}" data-photo="${r.id}">`
+      : `<div class="ph-none">ไม่มีรูป</div>`;
+    return `<div class="hist-item">
+      ${photo}
+      <div class="hist-info">
+        <div class="hist-dist">${fmt(r.distance)} KM</div>
+        <div class="hist-date">${fmtDate(r.date)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  listEl.querySelectorAll('img[data-photo]').forEach(img=>{
+    img.style.cursor = 'pointer';
+    img.addEventListener('click', ()=> openPhotoModal(img.src));
+  });
+}
+
+function openPhotoModal(src){
+  document.getElementById('photo-modal-img').src = src;
+  document.getElementById('photo-modal').classList.add('show');
+}
+document.getElementById('photo-modal').addEventListener('click', ()=>{
+  document.getElementById('photo-modal').classList.remove('show');
+});
+
+// ---------- Log Run ----------
+let pendingPhoto = null;
+
+async function handleLogPhotoChange(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  document.getElementById('photo-drop-label').textContent = 'กำลังประมวลผลรูป...';
+  try{
+    pendingPhoto = await compressImage(file);
+    document.getElementById('photo-drop').innerHTML = `<img src="${pendingPhoto}"><input type="file" accept="image/*" id="log-photo">`;
+    document.getElementById('log-photo').addEventListener('change', handleLogPhotoChange);
+  }catch(err){
+    console.error('compressImage error:', err);
+    showToast('อ่านรูปไม่สำเร็จ', true);
+  }
+}
+document.getElementById('log-photo').addEventListener('change', handleLogPhotoChange);
+
+document.getElementById('log-date').value = todayStr();
+
+document.getElementById('log-submit').addEventListener('click', async ()=>{
+  const name = document.getElementById('log-name').value.trim();
+  const password = document.getElementById('log-password').value;
+  const team = (memberTeams[name] && memberTeams[name].trim()) || NO_TEAM;
+  const distance = parseFloat(document.getElementById('log-distance').value);
+  const date = document.getElementById('log-date').value || todayStr();
+  const btn = document.getElementById('log-submit');
+
+  if(!name){ showToast('กรุณาใส่ชื่อของคุณ', true); return; }
+  if(memberPasswords[name] && password !== memberPasswords[name]){
+    showToast('รหัสผ่านไม่ถูกต้อง', true); return;
+  }
+  if(!distance || distance <= 0){ showToast('กรุณาใส่ระยะทางที่ถูกต้อง', true); return; }
+
+  btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+  runs.push({ id: uid(), name, team, distance, date, photo: pendingPhoto || null, ts: Date.now() });
+  const ok = await savePersonRuns(name);
+  btn.disabled = false; btn.textContent = 'บันทึก';
+
+  if(ok){
+    showToast(`บันทึก ${fmt(distance)} KM ให้ ${name} แล้ว`);
+    document.getElementById('log-distance').value = '';
+    document.getElementById('log-name').value = '';
+    document.getElementById('log-password').value = '';
+    updateLogTeamDisplay();
+    pendingPhoto = null;
+    document.getElementById('photo-drop').innerHTML = `<span id="photo-drop-label">แตะเพื่ออัปโหลดรูป</span><input type="file" accept="image/*" id="log-photo">`;
+    renderAll();
+  }else{
+    runs.pop();
+  }
+});
+
+// ---------- Admin ----------
+let adminUnlocked = false;
+
+function showAdminPanel(panelName){
+  document.querySelectorAll('.admin-subtab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.adminPanel === panelName);
+  });
+  document.querySelectorAll('.admin-panel').forEach(panel=>{
+    panel.classList.toggle('active', panel.id === 'admin-panel-' + panelName);
+  });
+  if(panelName === 'records') renderAdminTable();
+  if(panelName === 'passwords') renderPasswordManager();
+  if(panelName === 'teams'){
+    renderTeamManager();
+    renderTeamPhotoManager();
+  }
+}
+
+document.querySelectorAll('.admin-subtab').forEach(btn=>{
+  btn.addEventListener('click', ()=> showAdminPanel(btn.dataset.adminPanel));
+});
+
+document.getElementById('admin-unlock').addEventListener('click', ()=>{
+  const val = document.getElementById('admin-pass').value;
+  if(val === ADMIN_PASSWORD){
+    adminUnlocked = true;
+    document.getElementById('admin-locked').style.display = 'none';
+    document.getElementById('admin-unlocked').style.display = 'block';
+    showAdminPanel('records');
+    renderPasswordManager();
+    renderTeamManager();
+    renderTeamPhotoManager();
+  }else{
+    showToast('รหัสผ่านไม่ถูกต้อง', true);
+  }
+});
+document.getElementById('admin-logout').addEventListener('click', ()=>{
+  adminUnlocked = false;
+  document.getElementById('admin-pass').value = '';
+  document.getElementById('admin-locked').style.display = 'block';
+  document.getElementById('admin-unlocked').style.display = 'none';
+});
+
+function renderAdminTable(){
+  const tbody = document.getElementById('admin-tbody');
+  if(runs.length === 0){
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--muted); padding:20px;">ยังไม่มีรายการ</td></tr>`;
+    return;
+  }
+  const sorted = [...runs].sort((a,b)=> b.ts - a.ts);
+  tbody.innerHTML = sorted.map(r=>{
+    const photo = r.photo ? `<img src="${r.photo}" data-view-photo="${r.id}">` : '—';
+    return `<tr data-id="${r.id}">
+      <td>${photo}</td>
+      <td class="cell-name">${escapeHtml(r.name)}</td>
+      <td class="cell-team">${escapeHtml(memberTeams[r.name] || NO_TEAM)}</td>
+      <td class="cell-distance">${fmt(r.distance)}</td>
+      <td class="cell-date">${fmtDate(r.date)}</td>
+      <td>
+        <div class="row-actions">
+          <button class="edit">แก้ไข</button>
+          <button class="del">ลบ</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('img[data-view-photo]').forEach(img=>{
+    img.addEventListener('click', ()=> openPhotoModal(img.src));
+  });
+
+  tbody.querySelectorAll('button.edit').forEach(btn=>{
+    btn.addEventListener('click', (e)=> startEditRow(e.target.closest('tr')));
+  });
+  tbody.querySelectorAll('button.del').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      const tr = e.target.closest('tr');
+      const id = tr.dataset.id;
+      if(!confirm('ลบรายการนี้ใช่ไหม?')) return;
+      const idx = runs.findIndex(r=>r.id === id);
+      if(idx > -1){
+        const removed = runs.splice(idx,1)[0];
+        const ok = await savePersonRuns(removed.name);
+        if(ok){ showToast('ลบรายการแล้ว'); renderAll(); }
+        else runs.splice(idx,0,removed);
+      }
+    });
+  });
+}
+
+function startEditRow(tr){
+  const id = tr.dataset.id;
+  const r = runs.find(x=>x.id === id);
+  if(!r) return;
+  tr.querySelector('.cell-name').innerHTML = `<input class="edit-input" value="${escapeHtml(r.name)}">`;
+  tr.querySelector('.cell-distance').innerHTML = `<input class="edit-input" type="number" step="0.1" value="${r.distance}">`;
+  tr.querySelector('.cell-date').innerHTML = `<input class="edit-input" type="date" value="${r.date}">`;
+  const actions = tr.querySelector('.row-actions');
+  actions.innerHTML = `<button class="save">บันทึก</button><button class="del">ยกเลิก</button>`;
+
+  actions.querySelector('.save').addEventListener('click', async ()=>{
+    const nameVal = tr.querySelector('.cell-name input').value.trim();
+    const distVal = parseFloat(tr.querySelector('.cell-distance input').value);
+    const dateVal = tr.querySelector('.cell-date input').value;
+    if(!nameVal || !distVal || distVal <= 0 || !dateVal){
+      showToast('ข้อมูลไม่ถูกต้อง', true); return;
+    }
+    const backup = {...r};
+    const oldName = r.name;
+    r.name = nameVal; r.distance = distVal; r.date = dateVal;
+
+    let ok;
+    if(nameVal !== oldName){
+      // carry the team assignment along with the renamed member
+      if(memberTeams[oldName] !== undefined && memberTeams[nameVal] === undefined){
+        memberTeams[nameVal] = memberTeams[oldName];
+        delete memberTeams[oldName];
+        await saveTeams();
+      }
+      const ok1 = await savePersonRuns(oldName);
+      const ok2 = await savePersonRuns(nameVal);
+      ok = ok1 && ok2;
+    }else{
+      ok = await savePersonRuns(nameVal);
+    }
+
+    if(ok){ showToast('อัปเดตรายการแล้ว'); renderAll(); }
+    else{ Object.assign(r, backup); renderAdminTable(); }
+  });
+  actions.querySelector('.del').addEventListener('click', ()=> renderAdminTable());
+}
+
+function renderPasswordManager(){
+  const tbody = document.getElementById('pw-tbody');
+  const names = new Set([...Object.keys(memberPasswords), ...runs.map(r=>r.name)]);
+  const sorted = [...names].sort();
+  if(sorted.length === 0){
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--muted); padding:16px;">ยังไม่มีสมาชิก</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = sorted.map(name=>{
+    const hasPass = !!memberPasswords[name];
+    return `<tr data-name="${escapeHtml(name)}">
+      <td>${escapeHtml(name)}</td>
+      <td class="pw-cell">${hasPass ? '••••••' : '<span style="color:var(--muted); font-size:12px;">ยังไม่ได้ตั้ง</span>'}</td>
+      <td>
+        <div class="row-actions">
+          <button class="pw-edit">${hasPass ? 'เปลี่ยน' : 'ตั้งรหัส'}</button>
+          ${hasPass ? '<button class="pw-clear del">ลบรหัส</button>' : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.pw-edit').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const tr = e.target.closest('tr');
+      const name = tr.dataset.name;
+      const cell = tr.querySelector('.pw-cell');
+      cell.innerHTML = `<input class="edit-input" type="text" placeholder="รหัสผ่านใหม่">`;
+      const actions = tr.querySelector('.row-actions');
+      actions.innerHTML = `<button class="save">บันทึก</button><button class="del">ยกเลิก</button>`;
+      actions.querySelector('.save').addEventListener('click', async ()=>{
+        const val = cell.querySelector('input').value.trim();
+        if(!val){ showToast('กรุณาใส่รหัสผ่าน', true); return; }
+        memberPasswords[name] = val;
+        const ok = await savePasswords();
+        if(ok) showToast(`ตั้งรหัสผ่านให้ ${name} แล้ว`);
+        renderPasswordManager();
+      });
+      actions.querySelector('.del').addEventListener('click', ()=> renderPasswordManager());
+    });
+  });
+  tbody.querySelectorAll('.pw-clear').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      const tr = e.target.closest('tr');
+      const name = tr.dataset.name;
+      if(!confirm(`ลบรหัสผ่านของ ${name} ใช่ไหม?`)) return;
+      delete memberPasswords[name];
+      const ok = await savePasswords();
+      if(ok) showToast('ลบรหัสผ่านแล้ว');
+      renderPasswordManager();
+    });
+  });
+}
+
+document.getElementById('pw-add-btn').addEventListener('click', async ()=>{
+  const name = document.getElementById('pw-new-name').value.trim();
+  const pass = document.getElementById('pw-new-pass').value.trim();
+  if(!name || !pass){ showToast('กรอกชื่อและรหัสผ่านให้ครบ', true); return; }
+  memberPasswords[name] = pass;
+  const ok = await savePasswords();
+  if(ok){
+    showToast(`ตั้งรหัสผ่านให้ ${name} แล้ว`);
+    document.getElementById('pw-new-name').value = '';
+    document.getElementById('pw-new-pass').value = '';
+    renderPasswordManager();
+  }
+});
+
+let pendingTeamPhoto = null;
+
+function getKnownTeams(){
+  return [...new Set([
+    ...Object.values(memberTeams),
+    ...Object.keys(teamPhotos)
+  ].map(t=>(t||'').trim()).filter(Boolean))].sort();
+}
+
+function renderTeamPhotoManager(){
+  const select = document.getElementById('team-photo-team');
+  if(!select) return;
+  const current = select.value;
+  const teams = getKnownTeams();
+  select.innerHTML = '<option value="">-- เลือกทีม --</option>' +
+    teams.map(team=>`<option value="${escapeHtml(team)}">${escapeHtml(team)}</option>`).join('');
+  if(teams.includes(current)) select.value = current;
+  updateTeamPhotoPreview();
+}
+
+function updateTeamPhotoPreview(){
+  const team = document.getElementById('team-photo-team').value;
+  const preview = document.getElementById('team-photo-preview');
+  const label = document.getElementById('team-photo-label');
+  const saveBtn = document.getElementById('team-photo-save');
+  const deleteBtn = document.getElementById('team-photo-delete');
+  const currentPhoto = teamPhotos[team];
+  const src = pendingTeamPhoto || currentPhoto;
+
+  if(src){
+    preview.src = src;
+    preview.style.display = 'block';
+    label.textContent = pendingTeamPhoto ? 'รูปใหม่ที่เลือกไว้' : 'รูปทีมปัจจุบัน — แตะเพื่อเปลี่ยน';
+  }else{
+    preview.removeAttribute('src');
+    preview.style.display = 'none';
+    label.textContent = team ? 'แตะเพื่ออัปโหลดรูปทีม' : 'เลือกทีม แล้วแตะเพื่ออัปโหลดรูป';
+  }
+  saveBtn.disabled = !team || !pendingTeamPhoto;
+  deleteBtn.disabled = !team || !currentPhoto;
+}
+
+document.getElementById('team-photo-team').addEventListener('change', ()=>{
+  pendingTeamPhoto = null;
+  document.getElementById('team-photo-file').value = '';
+  updateTeamPhotoPreview();
+});
+
+document.getElementById('team-photo-file').addEventListener('change', async (e)=>{
+  const team = document.getElementById('team-photo-team').value;
+  const file = e.target.files[0];
+  if(!team){
+    e.target.value = '';
+    showToast('กรุณาเลือกทีมก่อนอัปโหลดรูป', true);
+    return;
+  }
+  if(!file) return;
+  document.getElementById('team-photo-label').textContent = 'กำลังประมวลผลรูป...';
+  try{
+    pendingTeamPhoto = await compressImage(file);
+    updateTeamPhotoPreview();
+  }catch(err){
+    pendingTeamPhoto = null;
+    showToast('อ่านรูปทีมไม่สำเร็จ', true);
+    updateTeamPhotoPreview();
+  }
+});
+
+document.getElementById('team-photo-save').addEventListener('click', async ()=>{
+  const team = document.getElementById('team-photo-team').value;
+  if(!team || !pendingTeamPhoto){
+    showToast('กรุณาเลือกทีมและรูป', true);
+    return;
+  }
+  const btn = document.getElementById('team-photo-save');
+  btn.disabled = true;
+  btn.textContent = 'กำลังบันทึก...';
+  const ok = await saveTeamPhoto(team, pendingTeamPhoto);
+  btn.textContent = 'บันทึกรูปทีม';
+  if(ok){
+    pendingTeamPhoto = null;
+    document.getElementById('team-photo-file').value = '';
+    showToast(`บันทึกรูปทีม ${team} แล้ว`);
+    renderTeamPhotoManager();
+    renderLeaderboard();
+  }else{
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('team-photo-delete').addEventListener('click', async ()=>{
+  const team = document.getElementById('team-photo-team').value;
+  if(!team || !teamPhotos[team]) return;
+  if(!confirm(`ลบรูปของทีม ${team} ใช่ไหม?`)) return;
+  const ok = await deleteTeamPhoto(team);
+  if(ok){
+    pendingTeamPhoto = null;
+    document.getElementById('team-photo-file').value = '';
+    showToast('ลบรูปทีมแล้ว');
+    renderTeamPhotoManager();
+    renderLeaderboard();
+  }
+});
+
+function renderTeamManager(){
+  const tbody = document.getElementById('team-tbody');
+  const names = new Set([...Object.keys(memberTeams), ...runs.map(r=>r.name)]);
+  const sorted = [...names].sort();
+  if(sorted.length === 0){
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--muted); padding:16px;">ยังไม่มีสมาชิก</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = sorted.map(name=>{
+    const team = memberTeams[name];
+    return `<tr data-name="${escapeHtml(name)}">
+      <td>${escapeHtml(name)}</td>
+      <td class="team-cell">${team ? escapeHtml(team) : '<span style="color:var(--muted); font-size:12px;">ยังไม่ได้กำหนด</span>'}</td>
+      <td>
+        <div class="row-actions">
+          <button class="team-edit">${team ? 'เปลี่ยน' : 'กำหนดทีม'}</button>
+          ${team ? '<button class="team-clear del">ล้างทีม</button>' : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.team-edit').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const tr = e.target.closest('tr');
+      const name = tr.dataset.name;
+      const cell = tr.querySelector('.team-cell');
+      cell.innerHTML = `<input class="edit-input" type="text" list="team-list" value="${escapeHtml(memberTeams[name]||'')}" placeholder="ชื่อทีม">`;
+      const actions = tr.querySelector('.row-actions');
+      actions.innerHTML = `<button class="save">บันทึก</button><button class="del">ยกเลิก</button>`;
+      actions.querySelector('.save').addEventListener('click', async ()=>{
+        const val = cell.querySelector('input').value.trim();
+        if(!val){ showToast('กรุณาใส่ชื่อทีม', true); return; }
+        memberTeams[name] = val;
+        const ok = await saveTeams();
+        if(ok) showToast(`กำหนดทีมให้ ${name} แล้ว`);
+        renderTeamManager();
+        renderAll();
+      });
+      actions.querySelector('.del').addEventListener('click', ()=> renderTeamManager());
+    });
+  });
+  tbody.querySelectorAll('.team-clear').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      const tr = e.target.closest('tr');
+      const name = tr.dataset.name;
+      if(!confirm(`ล้างทีมของ ${name} ใช่ไหม?`)) return;
+      delete memberTeams[name];
+      const ok = await saveTeams();
+      if(ok) showToast('ล้างทีมแล้ว');
+      renderTeamManager();
+      renderAll();
+    });
+  });
+}
+
+document.getElementById('team-add-btn').addEventListener('click', async ()=>{
+  const name = document.getElementById('team-new-name').value.trim();
+  const team = document.getElementById('team-new-team').value.trim();
+  if(!name || !team){ showToast('กรอกชื่อและทีมให้ครบ', true); return; }
+  memberTeams[name] = team;
+  const ok = await saveTeams();
+  if(ok){
+    showToast(`กำหนดทีมให้ ${name} แล้ว`);
+    document.getElementById('team-new-name').value = '';
+    document.getElementById('team-new-team').value = '';
+    renderTeamManager();
+    renderAll();
+  }
+});
+
+// ---------- Tabs ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-' + btn.dataset.view).classList.add('active');
+    if(btn.dataset.view === 'history') renderHistory();
+    if(btn.dataset.view === 'admin' && adminUnlocked){ showAdminPanel('records'); renderPasswordManager(); renderTeamManager(); renderTeamPhotoManager(); }
+  });
+});
+document.getElementById('hist-select').addEventListener('change', renderHistory);
+
+// ---------- Init ----------
+function renderAll(){
+  renderLeaderboard();
+  renderNameLists();
+  updateLogTeamDisplay();
+  if(document.getElementById('view-history').classList.contains('active')) renderHistory();
+  if(adminUnlocked){ renderAdminTable(); renderPasswordManager(); renderTeamManager(); renderTeamPhotoManager(); }
+}
+
+(async function init(){
+  await migrateOldData();
+  await loadRuns();
+  renderAll();
+})();
+</script>
+</body>
+</html>
